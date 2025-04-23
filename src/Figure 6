@@ -1,0 +1,72 @@
+library(dplyr)
+library(epitools)
+df <- plotted %>%
+  mutate(
+    PRS_quartile = ntile(PRS, 4),
+    RiskScore_quartile = ntile(riskScore, 4)
+  )
+df$Glaucoma <- as.numeric(as.character(df$Glaucoma))
+
+calculate_odds_ratio <- function(data) {
+  results <- list()
+  for (i in 2:4) {
+    data_subset <- data %>%
+      mutate(
+        riskGroup = case_when(
+          RiskScore_quartile == i ~ paste("RiskScore_quartile", i),
+          RiskScore_quartile == 1 ~ "RiskScore_quartile_1",
+          TRUE ~ "Other"
+        )
+      ) %>%
+      filter(riskGroup != "Other")
+    
+    contingency_table <- table(data_subset$riskGroup, data_subset$Glaucoma)
+    odds_ratio_result <- oddsratio(contingency_table)
+    p_value <- chisq.test(contingency_table)$p.value
+    
+    results[[i - 1]] <- data.frame(
+      PRS_quartile = unique(data$PRS_quartile),
+      RiskScore_quartile = i,
+      Inverse_OddsRatio = 1 / odds_ratio_result$measure[2, 1],
+      CI_Lower = 1 / odds_ratio_result$measure[2, 3],
+      CI_Upper = 1 / odds_ratio_result$measure[2, 2],
+      P_Value = p_value,
+      Glaucoma_Cases_RiskGroup = sum(data_subset$Glaucoma[data_subset$riskGroup == paste("RiskScore_quartile", i)]),
+      Glaucoma_Cases_Reference = sum(data_subset$Glaucoma[data_subset$riskGroup == "RiskScore_quartile_1"])
+    )
+  }
+  return(do.call(rbind, results))
+}
+
+# Calculate inversed odds ratios and p-values for each PRS quartile
+odds_ratios <- df %>%
+  group_by(PRS_quartile) %>%
+  do(calculate_odds_ratio(.))
+print(odds_ratios)
+
+library(ggplot2)
+ggplot(odds_ratios, aes(x = factor(PRS_quartile), y = Inverse_OddsRatio, fill = factor(RiskScore_quartile))) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  geom_errorbar(aes(ymin = CI_Upper, ymax = CI_Lower), width = 0.2, position = position_dodge(0.9)) +
+  labs(x = "PRS Quartile", y = "Odds Ratio", fill = "MRS") +
+  theme_classic() +
+  ggtitle("Odds Ratios of Glaucoma by Quartiles of PRS and MRS\nReferenced to 1st Quartile of MRS") +
+  scale_fill_manual(values = c("lightcoral", "lightblue", "lightgreen", "plum")) + 
+  theme(
+     axis.title.x = element_text(size = 14), 
+     axis.title.y = element_text(size = 14),
+     axis.text.x = element_text(size = 12), 
+     axis.text.y = element_text(size = 12) 
+   )
+
+# Fit logistic regression model with interaction term
+model <- glm(Glaucoma ~ PRS * riskScore + PRS + riskScore, family = binomial(), data = plotted)
+summary_model <- summary(model)
+print(summary_model)
+interaction_coefficient <- coef(summary_model)["PRS:riskScore", "Estimate"]
+interaction_p_value <- coef(summary_model)["PRS:riskScore", "Pr(>|z|)"]
+cat("Interaction Coefficient:", interaction_coefficient, "\n")
+cat("P-Value of Interaction:", interaction_p_value, "\n")
+
+quantile(df$PRS, probs = c(0, 0.25, 0.5, 0.75, 1))
+quantile(df$riskScore, probs = c(0, 0.25, 0.5, 0.75, 1))
