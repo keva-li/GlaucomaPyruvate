@@ -25,7 +25,7 @@ metabolites—lactate (P=8.8E-12), pyruvate (P=1.9E-10), and citrate (P=0.02)—
 reduced glaucoma prevalence. These metabolites combined significantly modified the PRS-
 glaucoma relationship (P interaction =0.011). Higher total resilience metabolite levels within the
 highest PRS quartile corresponded to lower glaucoma prevalence (Odds Ratio highest vs. lowest total resilience
-metabolite quartile =0.71, 95% Confidence Interval=0.64–0.80). As pyruvate is a foundational metabolite
+metabolite quartile = 0.71, 95% Confidence Interval=0.64–0.80). As pyruvate is a foundational metabolite
 linking glycolysis to tricarboxylic acid cycle metabolism and ATP generation, we pursued
 experimental validation for this putative resilience biomarker in a human-relevant Mus musculus
 glaucoma model. Dietary pyruvate mitigated elevated intraocular pressure (P=0.002) and optic
@@ -35,7 +35,6 @@ intervention.
 
 ## Setup
 
-The data folder includes an example dataset that can be used to run the code. 
 The R code is stored in the “src” folder. 
 
 ### System requirements
@@ -46,19 +45,14 @@ RStudio (https://posit.co/downloads/) for Mac.
 ### Installation guide
 
 All R code is available in the “src” folders. The whole analysis workflow is provided in 
-src/main.R. The code can be run by following the instructions in the src/main.R file. 
-Make sure to set the path to your study folder in main.R (main.dir = “my_folder/Cohorts/” 
-or main.dir = “my_folder/UKBiobank/”)
+src. The code can be run by following the instructions in the src.
 
 Typical installation time, including all required packages, is around 1 hour on a typical 
 desktop computer.
 
-### Demo
+### Data availability statement
 
-As data can not be shared due to privacy protocols in place, the authors provide example 
-datasets. The code will run on any other data formatted in 
-the same way as the example data. Details on the format of the example data are provided 
-in /src/main.R. 
+Data can not be shared due to privacy protocols in place.
 
 ### Instructions for use
 
