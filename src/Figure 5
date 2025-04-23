@@ -1,0 +1,96 @@
+metab_resilienceIDs <- c("X23471", "X23472", "X23473") # Lactate, Pyruvate, Citrate
+vars <- gsub(c(metab_resilienceIDs))
+X.3_resilience <- filtered_data[vars]
+metab_sum <- rowSums(X.3_resilience)
+plotted <- data.frame(PRS = filtered_data$mtag_prs, Glaucoma = y, riskScore = metab_sum)
+
+df <- plotted %>%
+  mutate(
+    RiskScore_quartile = ntile(riskScore, 4),
+    PRS_quartile = ntile(PRS, 4)
+  )
+
+print(quantile(plotted$riskScore, probs = c(0, 0.25, 0.5, 0.75, 1.0)))
+print(quantile(plotted$PRS, probs = c(0, 0.25, 0.5, 0.75, 1.0)))
+
+
+# Function to calculate odds ratios and perform statistical tests
+calculate_odds_ratio_and_test <- function(data, ref_data) {
+  # Load required package
+  if (!requireNamespace("epitools", quietly = TRUE)) {
+    stop("The 'epitools' package is required but not installed. Please install it first.")
+  }
+  
+  # Create contingency tables
+  ref_cases <- sum(ref_data$Glaucoma == 1)
+  ref_controls <- sum(ref_data$Glaucoma == 0)
+  cases <- sum(data$Glaucoma == 1)
+  controls <- sum(data$Glaucoma == 0)
+  
+  # Construct contingency table
+  contingency_table <- matrix(c(cases, controls, ref_cases, ref_controls), nrow = 2)
+  
+  # Calculate odds ratio and confidence intervals
+  or_results <- epitools::oddsratio(contingency_table, method = "wald")
+  or <- or_results$measure["exposure1", "estimate"]
+  lower_ci <- or_results$measure["exposure1", "lower"]
+  upper_ci <- or_results$measure["exposure1", "upper"]
+  
+  # Perform chi-squared test or Fisher's exact test depending on expected counts
+  if (min(contingency_table) < 5) {
+    test_result <- fisher.test(contingency_table)
+  } else {
+    test_result <- chisq.test(contingency_table)
+  }
+  
+  # Return results as a list
+  list(
+    OddsRatio = or,
+    LowerCI = lower_ci,
+    UpperCI = upper_ci,
+    PValue = test_result$p.value
+  )
+}
+
+# Select reference data (1st quartiles)
+reference_data <- df %>% filter(PRS_quartile == 1, RiskScore_quartile == 1)
+
+# Calculate odds ratios and p-values for each quartile against the reference
+odds_ratios <- df %>%
+  group_by(PRS_quartile, RiskScore_quartile) %>%
+  summarise(
+    OddsRatio = calculate_odds_ratio_and_test(cur_data(), reference_data)[1],
+    PValue = calculate_odds_ratio_and_test(cur_data(), reference_data)[2],
+    .groups = 'drop'
+  )
+
+# Plotting the inversed odds ratios
+ggplot(odds_ratios, aes(x = factor(PRS_quartile), y = Inverse_OddsRatio, fill = factor(RiskScore_quartile))) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  geom_errorbar(aes(ymin = CI_Upper, ymax = CI_Lower), width = 0.2, position = position_dodge(0.9)) +
+  labs(x = "PRS Quartile", y = "Odds Ratio", fill = "Metab sum") +
+  theme_classic() +
+  ggtitle("Odds Ratios of Glaucoma by Quartiles of PRS and Metab sum\nReferenced to 1st Quartile of Metab sum") +
+  scale_fill_manual(values = c("lightcoral", "lightblue", "lightgreen")) + 
+  theme(
+     axis.title.x = element_text(size = 14), 
+     axis.title.y = element_text(size = 14), 
+     axis.text.x = element_text(size = 12),  
+     axis.text.y = element_text(size = 12))
+
+# Fit logistic regression model with interaction term
+model <- glm(Glaucoma ~ PRS * riskScore + PRS + riskScore, family = binomial(), data = plotted)
+# Get the summary of the model
+summary_model <- summary(model)
+# Print the summary to see coefficients and p-values
+print(summary_model)
+# Specifically extract the coefficient and p-value for the interaction term
+interaction_coefficient <- coef(summary_model)["PRS:riskScore", "Estimate"]
+interaction_p_value <- coef(summary_model)["PRS:riskScore", "Pr(>|z|)"]
+# Display the interaction coefficient and its p-value
+cat("Interaction Coefficient:", interaction_coefficient, "\n")
+cat("P-Value of Interaction:", interaction_p_value, "\n")
+
+quantile(df$PRS, probs = c(0, 0.25, 0.5, 0.75, 1))
+quantile(df$riskScore, probs = c(0, 0.25, 0.5, 0.75, 1))
+
