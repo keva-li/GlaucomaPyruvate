@@ -1,0 +1,36 @@
+df <- filtered_data %>% select(c(mtag_prs, Glaucoma))
+df <- df %>% mutate(PRS_Percentile = rank(mtag_prs) / max(rank(mtag_prs)))
+df <- df %>% mutate(Percentile_Bin = cut(PRS_Percentile, breaks = seq(0, 1, by = 0.1), labels = FALSE))
+sum_glaucoma <- df %>% group_by(Percentile_Bin) %>% summarize(Sum_Glaucoma = sum(Glaucoma))
+
+ggplot(sum_glaucoma, aes(x = as.factor(Percentile_Bin), y = Sum_Glaucoma)) +
+  geom_bar(stat = "identity", color = "black", width = 0.8) + #, fill = "skyblue"
+  xlab("PRS Percentile Decile") +
+  ylab("Glaucoma Cases") +
+  ggtitle("Sum of Glaucoma Cases by PRS Percentile Decile") +
+  theme_minimal(base_size = 18) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5), 
+    panel.grid.major = element_line(color = "grey80"),  
+    panel.grid.minor = element_blank()  
+  )
+
+sum_glaucoma$Sum_Glaucoma %>% sum 
+
+# Plotting for no Glaucoma cases
+sum_no_glaucoma <- df %>%
+  group_by(Percentile_Bin) %>%
+  summarize(Sum_No_Glaucoma = sum(Glaucoma == 0))
+ggplot(sum_no_glaucoma, aes(x = as.factor(Percentile_Bin), y = Sum_No_Glaucoma)) + 
+  geom_bar(stat = "identity", color = "black", width = 0.8) + 
+  xlab("PRS Percentile Decile") + 
+  ylab("No Glaucoma") + 
+  ggtitle("No Glaucoma Cases by PRS Percentile Decile") + 
+  theme_minimal(base_size = 18) + 
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5), 
+    panel.grid.major = element_line(color = "grey80"), 
+    panel.grid.minor = element_blank()  
+  )
+
+df <- filtered_data %>% select(c(mtag_prs, Glaucoma))
