@@ -1,6 +1,6 @@
 ## Pyruvate and Related Energetic Metabolites Modulate Resilience Against High Genetic Risk for Glaucoma
 
-This code was used to generate the results of our [publication](https://www.nature.com/articles/s41467-023-38466-w). 
+This code was used to generate the results of our [publication](https://elifesciences.org/reviewed-preprints/105576). 
 
 ### REFERENCE
 If you use code or parts of this code in your work, please cite our publication:
