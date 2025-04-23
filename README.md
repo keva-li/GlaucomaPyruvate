@@ -7,7 +7,7 @@ If you use code or parts of this code in your work, please cite our publication:
 
 Li Keva, Tolman Nicholas, Segrè Ayellet V, Stuart Kelsey V, Zeleznik Oana A, Vallabh Neeru A, Hu Kuang, Zebardast Nazlee, Hanyuda Akiko, Raita Yoshihiko, Montgomery Christa, Zhang Chi, Hysi Pirro G, Do Ron, Khawaja Anthony P, Wiggs Janey L, Kang Jae H, John Simon WM, Pasquale Louis R, UK Biobank Eye and Vision Consortium  (2025) Pyruvate and Related Energetic Metabolites Modulate Resilience Against High Genetic Risk for Glaucoma eLife 14:RP105576
 
-[Life](https://elifesciences.org/reviewed-preprints/105576). eLife14:RP105576
+[eLife](https://elifesciences.org/reviewed-preprints/105576). eLife14:RP105576
 
 ### ABSTRACT
 
