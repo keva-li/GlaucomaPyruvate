@@ -1,0 +1,69 @@
+
+
+data$X21003_squared <- data$X21003^2
+regressed_out_dc <- c("X31", "X21003_squared", "X74", "season", "ethnicity", "X21003", "BP", "X20116", "X22040",  "X21001", "X30750", "SE", "time_of_day", "betablocker", "caffeine", "alcoholintake.x", "dm", "oral_steroid", "cad")
+rm(residuals_df)
+residuals_df <- data.frame(matrix(NA, nrow = nrow(data), ncol = length(all_metab_vars)))
+colnames(residuals_df) <- all_metab_vars
+for (outcome_variable in all_metab_vars) {
+  formula <- as.formula(paste(outcome_variable, "~ X31 + X21003_squared + X74 + season + ethnicity + X21003 + BP + X20116 + X22040 + X21001 + X30750 + SE + time_of_day + betablocker + caffeine + alcoholintake.x + dm + oral_steroid + cad"))
+  model <- lm(formula, data = data)
+  residuals_df[[outcome_variable]] <- residuals(model)
+}
+residuals_df <- cbind(data[regressed_out_dc], data[c("mtag_prs", "pop", "Glaucoma")], residuals_df)
+
+threshold <- quantile(residuals_df$mtag_prs, probs = 0.9) 
+residuals_1 <- residuals_df[residuals_df$mtag_prs > threshold, ]
+test <- residuals_1 %>% select(all_metab_vars)
+test <- cbind(residuals_1["Glaucoma"], test)
+df_long <- melt(test, id.vars = "Glaucoma")
+t_test_results <- list()
+glaucoma_count <- sum(residuals_1$Glaucoma == "1") 
+print(glaucoma_count)
+#bottom PRS
+threshold2 <- quantile(residuals_df$mtag_prs, probs = 0.5)
+residuals_2 <- residuals_df[residuals_df$mtag_prs < threshold2, ]
+test <- residuals_2 %>% select(all_metab_vars)
+test <- cbind(residuals_2["Glaucoma"], test)
+df_long <- melt(test, id.vars = "Glaucoma")
+t_test_results <- list()
+glaucoma_count <- sum(residuals_2$Glaucoma == "1")  
+print(glaucoma_count)
+glaucoma_count <- sum(residuals_2$Glaucoma == "0")
+print(glaucoma_count)
+
+for (variable in unique(df_long$variable)) {
+  print(variable)
+  data_variable <- df_long[df_long$variable == variable,]
+  data_glaucoma <- data_variable %>% filter(Glaucoma == 1) %>% pull(value)
+  data_no_glaucoma <- data_variable %>% filter(Glaucoma == 0) %>% pull(value)
+  t_test_result <- t.test(data_glaucoma, data_no_glaucoma)
+  t_test_results[[variable]] <- t_test_result
+}
+
+results_df <- data.frame(
+  variable = character(),
+  p_value = numeric(),  
+  t_statistic = numeric(), 
+  estimate_1 = numeric(),
+  estimate_2 = numeric()   
+)
+
+# Iterate over each t-test result and fill the dataframe
+for (i in seq_along(t_test_results)) {
+  # Extract information from t-test result
+  variable_name <- names(t_test_results)[i]
+  p_value <- t_test_results[[i]]$p.value
+  t_statistic <- t_test_results[[i]]$statistic
+  estimate_1 <- t_test_results[[i]]$estimate[1]
+  estimate_2 <- t_test_results[[i]]$estimate[2]
+  # Add information to the dataframe
+  results_df <- rbind(results_df, data.frame(
+    variable = variable_name,
+    p_value = p_value,
+    t_statistic = t_statistic,
+    estimate_1 = estimate_1,
+    estimate_2 = estimate_2
+  ))
+}
+row.names(results_df) <- NULL
