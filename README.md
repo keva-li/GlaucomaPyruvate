@@ -5,7 +5,9 @@ This code was used to generate the results of our [publication](https://www.natu
 ### REFERENCE
 If you use code or parts of this code in your work, please cite our publication:
 
-Zeleznik OA, Kang JH, Lasky-Su J, Eliassen AH, Frueh L, Clish CB, Rosner BA, Elze T, Hysi P, Khawaja A, Wiggs JL. Plasma metabolite profile for primary open-angle glaucoma in three US cohorts and the UK Biobank. [eLife]([https://www.nature.com/articles/s41467-023-38466-w](https://elifesciences.org/reviewed-preprints/105576)). eLife14:RP105576
+Li Keva, Tolman Nicholas, Segrè Ayellet V, Stuart Kelsey V, Zeleznik Oana A, Vallabh Neeru A, Hu Kuang, Zebardast Nazlee, Hanyuda Akiko, Raita Yoshihiko, Montgomery Christa, Zhang Chi, Hysi Pirro G, Do Ron, Khawaja Anthony P, Wiggs Janey L, Kang Jae H, John Simon WM, Pasquale Louis R, UK Biobank Eye and Vision Consortium  (2025) Pyruvate and Related Energetic Metabolites Modulate Resilience Against High Genetic Risk for Glaucoma eLife 14:RP105576
+
+[Life](https://elifesciences.org/reviewed-preprints/105576). eLife14:RP105576
 
 ### ABSTRACT
 
