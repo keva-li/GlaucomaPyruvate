@@ -1,0 +1,25 @@
+#alcohol is skewed so have to use median
+continuous_vars <- c("alcoholintake.x")
+# Create the table
+alc <- CreateTableOne(
+  vars = continuous_vars,
+  strata = "Glaucoma",
+  data = filtered_data,
+  addOverall = TRUE)
+# Print the table with median and range for continuous variables
+print(
+  alc, 
+  contDigits = 4,
+  pdigits = 6,
+  nonnormal = continuous_vars, 
+  quote = FALSE,               
+  noSpaces = TRUE              
+)
+
+# regular table
+table1 <- CreateTableOne(vars = c("X31", "X21003", "ethnicity", "pop", "X20116", "X22040", "X21001", "X30750", "SE", "IOP", "RNFL", "betablocker", "caffeine", "alcoholintake.x", "dm", "oral_steroid", "cad", "cholesterol_nonadjusted", "BP", "season", "time_of_day", "X74"),
+                             strata = "Glaucoma", addOverall = TRUE,
+                             data = filtered_data)
+
+output <- print(table1, smd = TRUE, noSpaces = TRUE)
+write.csv(output, file = "Results/table1.csv")
