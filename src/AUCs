@@ -1,1 +1,299 @@
 
+y <- factor(filtered_data$Glaucoma)
+split <- createDataPartition(y, p = 0.8, list = FALSE)
+run_model <- function(X, y = y, split = split, output = "Results/sample.csv") {
+  
+  model <- cbind(X, y)
+  train_data <- model[split, ]
+  test_data <- model[-split, ]
+  # Define training control
+  ctrl <- trainControl(method = "cv", number = 5)
+  # Train a logistic regression model
+  lr_model <- train(y ~ ., data = train_data, method = "glm", family = "binomial", trControl = ctrl)
+  # Make predictions on the test data
+  lr_predictions <- predict(lr_model, newdata = test_data, type = "prob")
+  # AUC Curve
+  observed <- as.numeric(as.character(test_data$y))
+  predictions <- lr_predictions[[2]]
+  
+  roc_curve <- pROC::roc(response = observed,  
+                         predictor = predictions,
+                         plot = FALSE)
+  auc_value <- pROC::auc(roc_curve) %>% round(4)
+  std_dev <- sqrt(var(roc_curve))
+  roc_curve <- pROC::roc(response = observed, 
+                         predictor = predictions,
+                         plot = TRUE, 
+                         col = "blue", 
+                         lwd = 2,
+                         main = paste0("Logistic Regression ROC Curve; AUC: ", auc_value, "+/-", std_dev))
+  # Create results table
+  result_table <- summary(lr_model)$coefficients
+  field_list <- as.list(setNames(subdict$Field, subdict$FieldID))
+  field_list <- field_list[field_list != ""]
+  field_list <- c(field_list, X311 = "Sex - Male", X21003 = "Age", `X2443-1` = "Diabetes - Do not know", X24430 = "Diabetes - No", X24431 = "Diabetes - Yes", X22040 = "MET minutes", `X201160` = "Never Smoker", `X201161` = "Previous Smoker", `X201162` = "Current Smoker")
+  
+  rownames(result_table) <- sapply(rownames(result_table), function(id) {
+    if (id %in% names(field_list)) {
+      return(field_list[[id]])
+    } else {
+      return(id)  # Keep original ID if not found in the list
+    }
+  })
+  write_clip(result_table)
+  write.csv(result_table, output)
+  
+  print(summary(lr_model))
+  return(roc_curve)
+}
+
+# Function to run the DeLong test
+run_delong_test <- function(roc_list) {
+  num_models <- length(roc_list)
+  p_values <- matrix(NA, nrow = num_models, ncol = num_models)
+  
+  for (i in 1:num_models) {
+    for (j in 1:num_models) {
+      if (i != j) {
+        delong_test <- roc.test(roc_list[[i]], roc_list[[j]])
+        p_values[i, j] <- delong_test$p.value
+      }
+    }
+  }
+  
+  return(p_values)
+}
+aucs <- lapply(roc_list, auc)
+vars <- lapply(roc_list, var) %>% lapply(sqrt)
+cis <- lapply(roc_list, ci)
+
+lower_interval <- lapply(cis, function(arr) arr[1])
+upper_interval <- lapply(cis, function(arr) arr[3])
+
+error_bar <- unlist(upper_interval) - unlist(aucs)
+
+auc_ci <- data.frame(unlist(aucs), unlist(vars), unlist(lower_interval), unlist(upper_interval), 
+                     error_bar)
+
+# For example:
+roc_list <- list(demo, democomorb, basemetab, fullmetab, basemetab_demo, fullmetab_demo, basemetab_demo_comorb, fullmetab_demo_comorb, PRS, PRS_demo, PRS_democomorb, PRS_basemetab_demo, PRS_fullmetab_demo, PRS_basemetab_democomorb, PRS_fullmetab_democomorb)
+column_names <- c("demo", "democomorb", "basemetab", "fullmetab", "basemetab_demo", "fullmetab_demo", "basemetab_demo_comorb", "fullmetab_demo_comorb", "PRS", "PRS_demo", "PRS_democomorb", "PRS_basemetab_demo", "PRS_fullmetab_demo", "PRS_basemetab_democomorb", "PRS_fullmetab_democomorb")
+
+# Run DeLong test
+p_values <- run_delong_test(roc_list)
+print(p_values)
+colnames(p_values) <- column_names
+rownames(p_values) <- column_names
+
+write.table(p_values, file = "Results/delongp_values_table.csv", sep = ",")
+
+# Example of how to obtain AUC for different models:
+PRS_fullmetab_democomorb <- run_model(X = X.5_totalmetabdemocomorb, y, split, output = "Results/result_table_M5_PRS_totalmetab_democomorb.csv")
+
+## Stratification by ethnicity, age, and gender
+
+X.comorbiditiesANDdemographics <- filtered_data[gsub("XSE", "SE", c(comorbidityIDs, "time_of_day", "season", "ethnicity", "X31", "X74", "X21003"))]
+vars <- gsub("XSE", "SE", c(all_metab_vars, comorbidityIDs, "time_of_day", "season", "ethnicity", "X31", "X74", "X21003")) # 
+X.3_total <- filtered_data[vars]
+
+# Goal will be to compare Model 3 with or without metabolites
+# Iterate over unique ethnicities
+unique_ethnicities <- unique(X.3_total$ethnicity)
+for (i in unique_ethnicities) {
+  print(i)
+  
+  # Filter data by ethnicity
+  data <- X.3_total[X.3_total$ethnicity == i, ]
+  data <- data[, !names(data) %in% c("ethnicity")]
+  
+  y_new <- y[X.3_total$ethnicity == i]
+  
+  # Create data partition
+  split <- createDataPartition(y_new, p = 0.8, list = FALSE)
+  
+  # Run model for fullmetab_democomorb
+  fullmetab_democomorb <- run_model(X = data, y = y_new, split = split, 
+                                    output = paste0("Results/result_table_", i, "_fullmetab_democomorb.csv"))
+  
+  # Filter data without metabolites and demographics
+  data_nometab <- X.comorbiditiesANDdemographics[X.comorbiditiesANDdemographics$ethnicity == i, ]
+  data_nometab <- data_nometab[, !names(data_nometab) %in% c("ethnicity")]
+  
+  # Run model for nometab_democomorb
+  nometab_democomorb <- run_model(X = data_nometab, y = y_new, split = split, 
+                                   output = paste0("Results/result_table_", i, "_nometab_democomorb.csv"))
+  print(paste("With metabolites:", auc(fullmetab_democomorb)))
+  print(paste("No metabolites:", auc(nometab_democomorb)))
+}
+
+X.comorbiditiesANDdemographics <- filtered_data[gsub("XSE", "SE", c(comorbidityIDs, "time_of_day", "season", "ethnicity", "X31", "X74", "X21003"))]
+vars <- gsub("XSE", "SE", c(all_metab_vars, comorbidityIDs, "time_of_day", "season", "ethnicity", "X31", "X74", "X21003")) # 
+X.3_total <- filtered_data[vars]
+unique_ethnicities <- unique(X.3_total$ethnicity)
+p_values <- list()
+# Iterate over unique ethnicities
+for (i in unique_ethnicities) {
+  print(i)
+  # Filter data by ethnicity
+  data <- X.3_total[X.3_total$ethnicity == i, ]
+  data <- data[, !names(data) %in% c("ethnicity")]
+  y_new <- y[X.3_total$ethnicity == i]
+  # Create data partition
+  split <- createDataPartition(y_new, p = 0.8, list = FALSE)
+  # Filter data without metabolites and demographics
+  data_nometab <- X.comorbiditiesANDdemographics[X.comorbiditiesANDdemographics$ethnicity == i, ]
+  data_nometab <- data_nometab[, !names(data_nometab) %in% c("ethnicity")]
+  # Run model for fullmetab_democomorb
+  fullmetab_democomorb <- run_model(X = data, y = y_new, split = split, 
+                                    output = paste0("Results/result_table_", i, "_fullmetab_democomorb.csv"))
+  # Run model for nometab_democomorb
+  nometab_democomorb <- run_model(X = data_nometab, y = y_new, split = split, 
+                                   output = paste0("Results/result_table_", i, "_nometab_democomorb.csv"))
+  # Perform DeLong test
+  delong_test_result <- roc.test(fullmetab_democomorb, nometab_democomorb, method = "delong")
+  
+  # Store the p-value for the ethnicity
+  p_values[[i]] <- delong_test_result$p.value
+  print(paste("DeLong test result for", i, ": p-value =", delong_test_result$p.value))
+}
+p_values_df <- data.frame(Ethnicity = names(p_values), P_Value = unlist(p_values))
+print(p_values_df)
+
+## Stratification by agegroup
+y <- factor(filtered_data$Glaucoma)
+split <- createDataPartition(y, p = 0.8, list = FALSE)
+comorbidityIDs <- c("BP", "X20116", "X22040", "X21001", "X30750", "SE",
+                    "betablocker", "caffeine", "alcoholintake.x", "dm", "oral_steroid", "cad")
+X.comorbiditiesANDdemographics <- filtered_data[gsub("XSE", "SE", c(comorbidityIDs, "time_of_day", "season", "ethnicity", "X31", "X74", "agegroup"))]
+vars <- gsub("XSE", "SE", c(all_metab_vars, comorbidityIDs, "time_of_day", "season", "ethnicity", "X31", "X74", "X21003")) # 
+X.3_total <- filtered_data[vars]
+vars <- gsub("XSE", "SE", c(all_metab_vars, comorbidityIDs, "time_of_day", "season", "ethnicity", "X31", "X74", "agegroup")) 
+X.3_total_age <- filtered_data[vars]
+
+unique_age <- unique(X.3_total_age$agegroup)
+for (i in unique_age) {
+  print(i)
+  data <- X.3_total_age[X.3_total_age$agegroup == i, ]
+  data <- data[, !names(data) %in% c("agegroup")]
+  y_new <- y[X.3_total_agfe$agegroup == i]
+  split <- createDataPartition(y_new, p = 0.8, list = FALSE)
+  # Run model for fullmetab_democomorb
+  fullmetab_democomorb <- run_model(X = data, y = y_new, split = split, 
+                                    output = paste0("Results/result_table_", i, "_fullmetab_democomorb.csv"))
+  # Filter data without metabolites and demographics
+  data_nometab <- X.comorbiditiesANDdemographics[X.comorbiditiesANDdemographics$agegroup == i, ]
+  data_nometab <- data_nometab[, !names(data_nometab) %in% c("agegroup")]
+  # Run model for nometab_democomorb
+  nometab_democomorb <- run_model(X = data_nometab, y = y_new, split = split, 
+                                   output = paste0("Results/result_table_", i, "_nometab_democomorb.csv"))
+  print(paste("With metabolites:", auc(fullmetab_democomorb)))
+  print(paste("No metabolites:", auc(nometab_democomorb)))
+}
+
+y <- factor(filtered_data$Glaucoma)
+split <- createDataPartition(y, p = 0.8, list = FALSE)
+comorbidityIDs <- c("BP", "X20116", "X22040", "X21001", "X30750", "SE",
+                    "betablocker", "caffeine", "alcoholintake.x", "dm", "oral_steroid", "cad")
+X.comorbiditiesANDdemographics <- filtered_data[gsub("XSE", "SE", c(comorbidityIDs, "time_of_day", "season", "ethnicity", "X31", "X74", "agegroup"))]
+vars <- gsub("XSE", "SE", c(all_metab_vars, comorbidityIDs, "time_of_day", "season", "ethnicity", "X31", "X74", "X21003")) # 
+X.3_total <- filtered_data[vars]
+vars <- gsub("XSE", "SE", c(all_metab_vars, comorbidityIDs, "time_of_day", "season", "ethnicity", "X31", "X74", "agegroup")) 
+X.3_total_age <- filtered_data[vars]
+
+unique_age <- unique(X.3_total_age$agegroup)   
+
+p_values <- list()
+
+# Iterate over unique ethnicities
+for (i in unique_age) {
+  print(i)
+  data <- X.3_total_age[X.3_total_age$agegroup == i, ]
+  data <- data[, !names(data) %in% c("agegroup")]
+  y_new <- y[X.3_total_age$agegroup == i]
+  split <- createDataPartition(y_new, p = 0.8, list = FALSE)
+  # Run model for fullmetab_democomorb
+  fullmetab_democomorb <- run_model(X = data, y = y_new, split = split, 
+                                    output = paste0("Results/result_table_", i, "_fullmetab_democomorb.csv"))
+  # Filter data without metabolites and demographics
+  data_nometab <- X.comorbiditiesANDdemographics[X.comorbiditiesANDdemographics$agegroup == i, ]
+  data_nometab <- data_nometab[, !names(data_nometab) %in% c("agegroup")]
+  # Run model for nometab_democomorb
+  nometab_democomorb <- run_model(X = data_nometab, y = y_new, split = split, 
+                                   output = paste0("Results/result_table_", i, "_nometab_democomorb.csv"))
+  # Perform DeLong test
+  delong_test_result <- roc.test(fullmetab_democomorb, nometab_democomorb, method = "delong")
+  p_values[[i]] <- delong_test_result$p.value
+  
+  print(paste("DeLong test result for", i, ": p-value =", delong_test_result$p.value))
+}
+
+p_values_df <- data.frame(Agegroup = names(p_values), P_Value = unlist(p_values))
+print(p_values_df)
+
+## Stratification by gender
+X.comorbiditiesANDdemographics <- filtered_data[gsub("XSE", "SE", c(comorbidityIDs, "time_of_day", "season", "ethnicity", "X31", "X74", "X21003"))]
+vars <- gsub("XSE", "SE", c(all_metab_vars, comorbidityIDs, "time_of_day", "season", "ethnicity", "X31", "X74", "X21003")) # 
+X.3_total <- filtered_data[vars]
+vars <- gsub("XSE", "SE", c(all_metab_vars, comorbidityIDs, "time_of_day", "season", "ethnicity", "X31", "X74", "X21003"))
+X.3_total_gender <- filtered_data[vars]
+
+unique_gender <- unique(X.3_total_gender$X31)
+for (i in unique_gender) {
+  print(i)
+  data <- X.3_total_gender [X.3_total_gender$X31 == i, ]
+  data <- data[, !names(data) %in% c("X31")]
+  y_new <- y[X.3_total_gender$X31 == i]
+  split <- createDataPartition(y_new, p = 0.8, list = FALSE)
+  # Run model for fullmetab_democomorb
+  fullmetab_democomorb <- run_model(X = data, y = y_new, split = split, 
+                                    output = paste0("Results/result_table_", i, "_fullmetab_democomorb.csv"))
+  # Filter data without metabolites and demographics
+  data_nometab <- X.comorbiditiesANDdemographics[X.comorbiditiesANDdemographics$X31 == i, ]
+  data_nometab <- data_nometab[, !names(data_nometab) %in% c("X31")]
+  # Run model for nometab_democomorb
+  nometab_democomorb <- run_model(X = data_nometab, y = y_new, split = split, 
+                                   output = paste0("Results/result_table_", i, "_nometab_democomorb.csv"))
+  print(paste("With metabolites:", auc(fullmetab_democomorb)))
+  print(paste("No metabolites:", auc(nometab_democomorb)))
+}
+X.comorbiditiesANDdemographics <- filtered_data[gsub("XSE", "SE", c(comorbidityIDs, "time_of_day", "season", "ethnicity", "X31", "X74", "X21003"))]
+vars <- gsub("XSE", "SE", c(all_metab_vars, comorbidityIDs, "time_of_day", "season", "ethnicity", "X31", "X74", "X21003")) # 
+X.3_total <- filtered_data[vars]
+vars <- gsub("XSE", "SE", c(all_metab_vars, comorbidityIDs, "time_of_day", "season", "ethnicity", "X31", "X74", "X21003"))
+X.3_total_gender <- filtered_data[vars]
+
+unique_gender <- unique(X.3_total_gender$X31)
+p_values <- vector("list", length(unique_gender))
+names(p_values) <- unique_gender
+
+index <- 1
+
+for (i in unique_gender) {
+  print(i)
+  data <- X.3_total_gender[X.3_total_gender$X31 == i, ]
+  data <- data[, !names(data) %in% c("X31")]
+  y_new <- y[X.3_total_gender$X31 == i]
+  split <- createDataPartition(y_new, p = 0.8, list = FALSE)
+  
+  # Run model for fullmetab_democomorb
+  fullmetab_democomorb <- run_model(X = data, y = y_new, split = split, 
+                                    output = paste0("Results/result_table_", i, "_fullmetab_democomorb.csv"))
+  
+  # Filter data without metabolites and demographics
+  data_nometab <- X.comorbiditiesANDdemographics[X.comorbiditiesANDdemographics$X31 == i, ]
+  data_nometab <- data_nometab[, !names(data_nometab) %in% c("X31")]
+  
+  # Run model for nometab_democomorb
+  nometab_democomorb <- run_model(X = data_nometab, y = y_new, split = split, 
+                                   output = paste0("Results/result_table_", i, "_nometab_democomorb.csv"))
+  
+  # Perform DeLong test
+  delong_test_result <- roc.test(fullmetab_democomorb, nometab_democomorb, method = "delong")
+  p_values[[index]] <- delong_test_result$p.value
+  index <- index + 1
+  
+  print(paste("DeLong test result for", i, ": p-value =", delong_test_result$p.value))
+}
+
+p_values_df <- data.frame(Gender = names(p_values), P_Value = unlist(p_values))
+print(p_values_df)
