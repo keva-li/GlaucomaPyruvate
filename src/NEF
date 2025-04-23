@@ -1,0 +1,9 @@
+
+
+metab_X <- filtered_data[all_metab_vars]
+cor_matrix <- cor(metab_X, use = "pairwise.complete.obs")
+eigen_decomp <- eigen(cor_matrix)
+eigenvalues <- eigen_decomp$values
+NEF <- eigenvalues / sum(eigenvalues)
+NEF_count <- (NEF > 0.01) %>% sum
+print(NEF_count)
