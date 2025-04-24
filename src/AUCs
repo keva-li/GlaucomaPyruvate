@@ -37,10 +37,9 @@ run_model <- function(X, y = y, split = split, output = "Results/sample.csv") {
     if (id %in% names(field_list)) {
       return(field_list[[id]])
     } else {
-      return(id)  # Keep original ID if not found in the list
+      return(id)
     }
   })
-  write_clip(result_table)
   write.csv(result_table, output)
   
   print(summary(lr_model))
@@ -75,7 +74,7 @@ error_bar <- unlist(upper_interval) - unlist(aucs)
 auc_ci <- data.frame(unlist(aucs), unlist(vars), unlist(lower_interval), unlist(upper_interval), 
                      error_bar)
 
-# For example:
+# Running models, For example:
 roc_list <- list(demo, democomorb, basemetab, fullmetab, basemetab_demo, fullmetab_demo, basemetab_demo_comorb, fullmetab_demo_comorb, PRS, PRS_demo, PRS_democomorb, PRS_basemetab_demo, PRS_fullmetab_demo, PRS_basemetab_democomorb, PRS_fullmetab_democomorb)
 column_names <- c("demo", "democomorb", "basemetab", "fullmetab", "basemetab_demo", "fullmetab_demo", "basemetab_demo_comorb", "fullmetab_demo_comorb", "PRS", "PRS_demo", "PRS_democomorb", "PRS_basemetab_demo", "PRS_fullmetab_demo", "PRS_basemetab_democomorb", "PRS_fullmetab_democomorb")
 
@@ -96,19 +95,16 @@ X.comorbiditiesANDdemographics <- filtered_data[gsub("XSE", "SE", c(comorbidityI
 vars <- gsub("XSE", "SE", c(all_metab_vars, comorbidityIDs, "time_of_day", "season", "ethnicity", "X31", "X74", "X21003")) # 
 X.3_total <- filtered_data[vars]
 
-# Goal will be to compare Model 3 with or without metabolites
+# Compare Model 3 with or without metabolites
 # Iterate over unique ethnicities
 unique_ethnicities <- unique(X.3_total$ethnicity)
 for (i in unique_ethnicities) {
   print(i)
-  
-  # Filter data by ethnicity
   data <- X.3_total[X.3_total$ethnicity == i, ]
   data <- data[, !names(data) %in% c("ethnicity")]
   
   y_new <- y[X.3_total$ethnicity == i]
-  
-  # Create data partition
+
   split <- createDataPartition(y_new, p = 0.8, list = FALSE)
   
   # Run model for fullmetab_democomorb
@@ -131,14 +127,11 @@ vars <- gsub("XSE", "SE", c(all_metab_vars, comorbidityIDs, "time_of_day", "seas
 X.3_total <- filtered_data[vars]
 unique_ethnicities <- unique(X.3_total$ethnicity)
 p_values <- list()
-# Iterate over unique ethnicities
 for (i in unique_ethnicities) {
   print(i)
-  # Filter data by ethnicity
   data <- X.3_total[X.3_total$ethnicity == i, ]
   data <- data[, !names(data) %in% c("ethnicity")]
   y_new <- y[X.3_total$ethnicity == i]
-  # Create data partition
   split <- createDataPartition(y_new, p = 0.8, list = FALSE)
   # Filter data without metabolites and demographics
   data_nometab <- X.comorbiditiesANDdemographics[X.comorbiditiesANDdemographics$ethnicity == i, ]
@@ -152,7 +145,6 @@ for (i in unique_ethnicities) {
   # Perform DeLong test
   delong_test_result <- roc.test(fullmetab_democomorb, nometab_democomorb, method = "delong")
   
-  # Store the p-value for the ethnicity
   p_values[[i]] <- delong_test_result$p.value
   print(paste("DeLong test result for", i, ": p-value =", delong_test_result$p.value))
 }
@@ -204,7 +196,6 @@ unique_age <- unique(X.3_total_age$agegroup)
 
 p_values <- list()
 
-# Iterate over unique ethnicities
 for (i in unique_age) {
   print(i)
   data <- X.3_total_age[X.3_total_age$agegroup == i, ]
@@ -257,7 +248,7 @@ for (i in unique_gender) {
   print(paste("No metabolites:", auc(nometab_democomorb)))
 }
 X.comorbiditiesANDdemographics <- filtered_data[gsub("XSE", "SE", c(comorbidityIDs, "time_of_day", "season", "ethnicity", "X31", "X74", "X21003"))]
-vars <- gsub("XSE", "SE", c(all_metab_vars, comorbidityIDs, "time_of_day", "season", "ethnicity", "X31", "X74", "X21003")) # 
+vars <- gsub("XSE", "SE", c(all_metab_vars, comorbidityIDs, "time_of_day", "season", "ethnicity", "X31", "X74", "X21003"))  
 X.3_total <- filtered_data[vars]
 vars <- gsub("XSE", "SE", c(all_metab_vars, comorbidityIDs, "time_of_day", "season", "ethnicity", "X31", "X74", "X21003"))
 X.3_total_gender <- filtered_data[vars]
